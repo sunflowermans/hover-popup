@@ -111,6 +111,21 @@
     );
   }
 
+  function isImagePath(pathname) {
+    return /\.(avif|bmp|gif|ico|jpe?g|png|svg|webp)$/i.test(pathname);
+  }
+
+  function isImageLink(anchor, url) {
+    if (isImagePath(url.pathname)) return true;
+    const img = anchor.querySelector("img[src]");
+    if (!img) return false;
+    try {
+      return resolveUrl(img.getAttribute("src")).pathname === url.pathname;
+    } catch {
+      return false;
+    }
+  }
+
   function isInternalPageLink(anchor) {
     if (!anchor || anchor.closest(".jhp-hwin__actions")) return false;
 
@@ -126,6 +141,8 @@
 
     if (url.origin !== window.location.origin) return false;
     if (url.pathname.endsWith(".pdf") || url.pathname.endsWith(".zip")) return false;
+
+    if (isImageLink(anchor, url)) return true;
 
     if (isSamePage(url)) return !!url.hash;
     if (url.hash) return true;
@@ -215,8 +232,37 @@
     return doc;
   }
 
+  async function loadImageContent(url, anchor) {
+    const img = document.createElement("img");
+    img.alt = anchor.querySelector("img")?.alt || "";
+    img.decoding = "async";
+
+    await new Promise((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error(`Failed to load image ${url.href}`));
+      img.src = url.href;
+    });
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "jhp-image-preview";
+    wrapper.appendChild(img);
+
+    const filename = decodeURIComponent(url.pathname.split("/").pop() || "Image");
+
+    return {
+      content: wrapper,
+      title: img.alt || filename,
+      pageUrl: url.href,
+    };
+  }
+
   async function loadLinkContent(anchor) {
     const url = resolveUrl(anchor.href);
+
+    if (isImageLink(anchor, url)) {
+      return loadImageContent(url, anchor);
+    }
+
     const hash = url.hash;
 
     let doc;
@@ -334,14 +380,23 @@
     contentEl.style.height = "";
     contentEl.style.maxHeight = `${Math.floor(window.innerHeight * MAX_VIEWPORT_HEIGHT) - BAR_HEIGHT}px`;
 
-    const contentWidth = contentEl.scrollWidth;
+    const img = contentEl.querySelector("img");
+    let contentWidth = contentEl.scrollWidth;
+    if (img && img.naturalWidth) {
+      contentWidth = Math.max(contentWidth, img.naturalWidth);
+    }
+
     const targetWidth = Math.min(
       Math.max(contentWidth + 24, MIN_WIDTH),
       Math.floor(window.innerWidth * MAX_VIEWPORT_WIDTH)
     );
     winEl.style.width = `${targetWidth}px`;
 
-    const naturalHeight = contentEl.scrollHeight;
+    let naturalHeight = contentEl.scrollHeight;
+    if (img && img.naturalHeight) {
+      naturalHeight = Math.max(naturalHeight, img.naturalHeight);
+    }
+
     const maxContentHeight = Math.floor(window.innerHeight * MAX_VIEWPORT_HEIGHT) - BAR_HEIGHT;
     contentEl.style.maxHeight = `${Math.min(naturalHeight, maxContentHeight)}px`;
   }
@@ -546,7 +601,7 @@
     topBorder.appendChild(header);
 
     const contentEl = document.createElement("div");
-    contentEl.className = "jhp-hwin__content";
+    contentEl.className = "jhp-hwin__content main-content";
 
     const bottomBorder = document.createElement("div");
     bottomBorder.className = "jhp-border jhp-border--bottom";

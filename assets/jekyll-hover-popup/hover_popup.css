@@ -152,12 +152,18 @@
   margin-top: 0;
 }
 
-.jhp-hwin__content a {
-  color: var(--jhp-link-color);
-}
-
 .jhp-hwin__content .anchor-heading {
   display: none;
+}
+
+.jhp-hwin__content .jhp-image-preview {
+  line-height: 0;
+}
+
+.jhp-hwin__content .jhp-image-preview img {
+  display: block;
+  max-width: 100%;
+  height: auto;
 }
 
 .jhp-hwin__loading {

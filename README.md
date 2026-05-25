@@ -12,7 +12,7 @@ Inspired by the hover window behavior in [5etools](https://github.com/5etools/5e
 - Pinned links do not open additional previews on further hovers
 - Section links (`#heading-id`) show only that section; page links show the full page content
 - External links and non-page links are ignored
-- Links inside previews use the same hover behavior; clicks navigate the main window normally
+- Popup windows are resizable (8 drag handles) and styled from the host page's computed theme
 
 ## Install
 

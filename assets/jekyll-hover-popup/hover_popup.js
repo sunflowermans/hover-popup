@@ -10,6 +10,17 @@
   const BAR_HEIGHT = 20;
   const GAP = 10;
 
+  const DRAG_NONE = 0;
+  const DRAG_MOVE = 1;
+  const DRAG_N = 2;
+  const DRAG_NE = 3;
+  const DRAG_E = 4;
+  const DRAG_SE = 5;
+  const DRAG_S = 6;
+  const DRAG_SW = 7;
+  const DRAG_W = 8;
+  const DRAG_NW = 9;
+
   const pageCache = new Map();
   const linkMeta = new WeakMap();
   const persistentUrls = new Set();
@@ -17,6 +28,57 @@
   const openWindows = new Map();
   let nextWindowId = 0;
   let nextZIndex = 10000;
+
+  function readStyle(el, prop) {
+    if (!el) return "";
+    return getComputedStyle(el).getPropertyValue(prop);
+  }
+
+  function syncThemeVars() {
+    const root = document.documentElement;
+    const body = document.body;
+    const main = document.querySelector("#main-content main") || document.querySelector("main");
+    const sidebar = document.querySelector(".side-bar");
+    const link = document.querySelector("#main-content a[href], main a[href], .site-nav a[href]");
+    const blockquote = document.querySelector("#main-content blockquote, main blockquote");
+    const code = document.querySelector("#main-content code, main code");
+
+    const bodyStyle = body ? getComputedStyle(body) : null;
+    const mainStyle = main ? getComputedStyle(main) : bodyStyle;
+    const sidebarStyle = sidebar ? getComputedStyle(sidebar) : bodyStyle;
+    const linkStyle = link ? getComputedStyle(link) : null;
+    const blockquoteStyle = blockquote ? getComputedStyle(blockquote) : null;
+    const codeStyle = code ? getComputedStyle(code) : null;
+
+    const set = (name, value) => {
+      if (value) root.style.setProperty(name, value);
+    };
+
+    set("--jhp-body-bg", bodyStyle?.backgroundColor);
+    set("--jhp-body-color", mainStyle?.color || bodyStyle?.color);
+    set("--jhp-header-bg", sidebarStyle?.backgroundColor || bodyStyle?.backgroundColor);
+    set("--jhp-link-color", linkStyle?.color);
+    set(
+      "--jhp-border-color",
+      blockquoteStyle?.borderLeftColor ||
+        codeStyle?.borderColor ||
+        (bodyStyle?.color ? `color-mix(in srgb, ${bodyStyle.color} 18%, transparent)` : "")
+    );
+    set(
+      "--jhp-shadow-color",
+      bodyStyle?.color ? `color-mix(in srgb, ${bodyStyle.color} 28%, transparent)` : ""
+    );
+    set(
+      "--jhp-accent-hover",
+      bodyStyle?.color ? `color-mix(in srgb, ${bodyStyle.color} 10%, transparent)` : ""
+    );
+    set("--jhp-font-family", mainStyle?.fontFamily || bodyStyle?.fontFamily);
+    set("--jhp-font-size", mainStyle?.fontSize || bodyStyle?.fontSize);
+    set("--jhp-line-height", mainStyle?.lineHeight || bodyStyle?.lineHeight);
+
+    const colorScheme = readStyle(body, "color-scheme") || readStyle(root, "color-scheme");
+    if (colorScheme) root.style.colorScheme = colorScheme.trim();
+  }
 
   function getClientX(evt) {
     if (evt.touches && evt.touches.length) return evt.touches[0].clientX;
@@ -269,6 +331,7 @@
   }
 
   function fitWindowToContent(winEl, contentEl) {
+    contentEl.style.height = "";
     contentEl.style.maxHeight = `${Math.floor(window.innerHeight * MAX_VIEWPORT_HEIGHT) - BAR_HEIGHT}px`;
 
     const contentWidth = contentEl.scrollWidth;
@@ -283,7 +346,163 @@
     contentEl.style.maxHeight = `${Math.min(naturalHeight, maxContentHeight)}px`;
   }
 
+  function addResizeHandle(winEl, className, type, onBegin) {
+    const handle = document.createElement("div");
+    handle.className = `jhp-resize ${className}`;
+    handle.addEventListener("mousedown", (evt) => {
+      if (evt.button !== 0) return;
+      evt.preventDefault();
+      evt.stopPropagation();
+      onBegin(evt, type);
+    });
+    winEl.appendChild(handle);
+    return handle;
+  }
+
+  function setupWindowInteraction(winEl, header, contentEl, windowMeta) {
+    const drag = {
+      type: DRAG_NONE,
+      startX: 0,
+      startY: 0,
+      baseTop: 0,
+      baseLeft: 0,
+      baseWidth: 0,
+      baseHeight: 0,
+    };
+
+    function beginInteraction(evt, type) {
+      drag.type = type;
+      drag.startX = getClientX(evt);
+      drag.startY = getClientY(evt);
+      drag.baseTop = parseFloat(winEl.style.top) || winEl.getBoundingClientRect().top;
+      drag.baseLeft = parseFloat(winEl.style.left) || winEl.getBoundingClientRect().left;
+      drag.baseWidth = winEl.offsetWidth;
+      drag.baseHeight = contentEl.offsetHeight;
+
+      if (type !== DRAG_MOVE) {
+        contentEl.style.maxHeight = "none";
+        contentEl.style.height = `${drag.baseHeight}px`;
+        winEl.style.maxWidth = "none";
+      }
+
+      winEl.style.zIndex = String(++nextZIndex);
+      document.addEventListener("mousemove", onPointerMove);
+      document.addEventListener("mouseup", onPointerUp);
+    }
+
+    function handleNorthDrag(evt) {
+      const diffY = Math.max(drag.startY - getClientY(evt), MIN_HEIGHT - drag.baseHeight);
+      contentEl.style.height = `${drag.baseHeight + diffY}px`;
+      winEl.style.top = `${drag.baseTop - diffY}px`;
+      drag.startY = getClientY(evt);
+      drag.baseHeight = contentEl.offsetHeight;
+      drag.baseTop = parseFloat(winEl.style.top) || winEl.getBoundingClientRect().top;
+    }
+
+    function handleEastDrag(evt) {
+      const diffX = drag.startX - getClientX(evt);
+      winEl.style.width = `${Math.max(MIN_WIDTH, drag.baseWidth - diffX)}px`;
+      drag.startX = getClientX(evt);
+      drag.baseWidth = winEl.offsetWidth;
+    }
+
+    function handleSouthDrag(evt) {
+      const diffY = drag.startY - getClientY(evt);
+      contentEl.style.height = `${Math.max(MIN_HEIGHT, drag.baseHeight - diffY)}px`;
+      drag.startY = getClientY(evt);
+      drag.baseHeight = contentEl.offsetHeight;
+    }
+
+    function handleWestDrag(evt) {
+      const diffX = Math.max(drag.startX - getClientX(evt), MIN_WIDTH - drag.baseWidth);
+      winEl.style.width = `${drag.baseWidth + diffX}px`;
+      winEl.style.left = `${drag.baseLeft - diffX}px`;
+      drag.startX = getClientX(evt);
+      drag.baseWidth = winEl.offsetWidth;
+      drag.baseLeft = parseFloat(winEl.style.left) || winEl.getBoundingClientRect().left;
+    }
+
+    function onPointerMove(evt) {
+      switch (drag.type) {
+        case DRAG_MOVE: {
+          const dx = drag.startX - getClientX(evt);
+          const dy = drag.startY - getClientY(evt);
+          winEl.style.left = `${drag.baseLeft - dx}px`;
+          winEl.style.top = `${drag.baseTop - dy}px`;
+          drag.startX = getClientX(evt);
+          drag.startY = getClientY(evt);
+          drag.baseLeft = parseFloat(winEl.style.left) || winEl.getBoundingClientRect().left;
+          drag.baseTop = parseFloat(winEl.style.top) || winEl.getBoundingClientRect().top;
+          break;
+        }
+        case DRAG_N:
+          handleNorthDrag(evt);
+          break;
+        case DRAG_NE:
+          handleNorthDrag(evt);
+          handleEastDrag(evt);
+          break;
+        case DRAG_E:
+          handleEastDrag(evt);
+          break;
+        case DRAG_SE:
+          handleSouthDrag(evt);
+          handleEastDrag(evt);
+          break;
+        case DRAG_S:
+          handleSouthDrag(evt);
+          break;
+        case DRAG_SW:
+          handleSouthDrag(evt);
+          handleWestDrag(evt);
+          break;
+        case DRAG_W:
+          handleWestDrag(evt);
+          break;
+        case DRAG_NW:
+          handleNorthDrag(evt);
+          handleWestDrag(evt);
+          break;
+        default:
+          break;
+      }
+
+      if (drag.type !== DRAG_NONE) {
+        adjustWindowToViewport(winEl, contentEl, null);
+      }
+    }
+
+    function onPointerUp() {
+      if (drag.type === DRAG_NONE) return;
+      drag.type = DRAG_NONE;
+      document.removeEventListener("mousemove", onPointerMove);
+      document.removeEventListener("mouseup", onPointerUp);
+      adjustWindowToViewport(winEl, contentEl, null);
+    }
+
+    windowMeta.endInteraction = onPointerUp;
+
+    header.addEventListener("mousedown", (evt) => {
+      if (winEl.dataset.perm !== "true") return;
+      if (evt.button !== 0) return;
+      if (evt.target.closest(".jhp-hwin__btn")) return;
+      evt.preventDefault();
+      beginInteraction(evt, DRAG_MOVE);
+    });
+
+    addResizeHandle(winEl, "jhp-resize-n", DRAG_N, beginInteraction);
+    addResizeHandle(winEl, "jhp-resize-ne", DRAG_NE, beginInteraction);
+    addResizeHandle(winEl, "jhp-resize-e", DRAG_E, beginInteraction);
+    addResizeHandle(winEl, "jhp-resize-se", DRAG_SE, beginInteraction);
+    addResizeHandle(winEl, "jhp-resize-s", DRAG_S, beginInteraction);
+    addResizeHandle(winEl, "jhp-resize-sw", DRAG_SW, beginInteraction);
+    addResizeHandle(winEl, "jhp-resize-w", DRAG_W, beginInteraction);
+    addResizeHandle(winEl, "jhp-resize-nw", DRAG_NW, beginInteraction);
+  }
+
   function createWindow({ title, pageUrl, isPermanent, onClose }) {
+    syncThemeVars();
+
     const id = ++nextWindowId;
     const zIndex = ++nextZIndex;
 
@@ -292,6 +511,9 @@
     winEl.dataset.perm = isPermanent ? "true" : "false";
     winEl.style.zIndex = String(zIndex);
     winEl.style.visibility = "hidden";
+
+    const topBorder = document.createElement("div");
+    topBorder.className = "jhp-border jhp-border--top";
 
     const header = document.createElement("div");
     header.className = "jhp-hwin__header";
@@ -321,57 +543,24 @@
 
     header.appendChild(titleEl);
     header.appendChild(actions);
+    topBorder.appendChild(header);
 
     const contentEl = document.createElement("div");
     contentEl.className = "jhp-hwin__content";
 
-    winEl.appendChild(header);
+    const bottomBorder = document.createElement("div");
+    bottomBorder.className = "jhp-border jhp-border--bottom";
+
+    winEl.appendChild(topBorder);
     winEl.appendChild(contentEl);
+    winEl.appendChild(bottomBorder);
     document.body.appendChild(winEl);
-
-    const drag = { active: false, startX: 0, startY: 0, baseLeft: 0, baseTop: 0 };
-
-    function onMouseMoveDrag(evt) {
-      if (!drag.active) return;
-      const dx = drag.startX - getClientX(evt);
-      const dy = drag.startY - getClientY(evt);
-      winEl.style.left = `${drag.baseLeft - dx}px`;
-      winEl.style.top = `${drag.baseTop - dy}px`;
-      adjustWindowToViewport(winEl, contentEl, null);
-    }
-
-    function onMouseUpDrag() {
-      drag.active = false;
-      document.removeEventListener("mousemove", onMouseMoveDrag);
-      document.removeEventListener("mouseup", onMouseUpDrag);
-    }
-
-    header.addEventListener("mousedown", (evt) => {
-      if (winEl.dataset.perm !== "true") return;
-      if (evt.target.closest(".jhp-hwin__btn")) return;
-      drag.active = true;
-      drag.startX = getClientX(evt);
-      drag.startY = getClientY(evt);
-      drag.baseLeft = parseFloat(winEl.style.left) || winEl.getBoundingClientRect().left;
-      drag.baseTop = parseFloat(winEl.style.top) || winEl.getBoundingClientRect().top;
-      winEl.style.zIndex = String(++nextZIndex);
-      document.addEventListener("mousemove", onMouseMoveDrag);
-      document.addEventListener("mouseup", onMouseUpDrag);
-    });
-
-    closeBtn.addEventListener("click", (evt) => {
-      evt.stopPropagation();
-      if (evt.ctrlKey || evt.metaKey) {
-        closeAllWindows();
-        return;
-      }
-      windowMeta.close();
-    });
 
     const windowMeta = {
       id,
       el: winEl,
       contentEl,
+      endInteraction: null,
       setContent(node) {
         contentEl.innerHTML = "";
         contentEl.appendChild(node);
@@ -390,12 +579,23 @@
         winEl.dataset.perm = value ? "true" : "false";
       },
       close() {
-        onMouseUpDrag();
+        if (windowMeta.endInteraction) windowMeta.endInteraction();
         if (winEl.parentNode) winEl.parentNode.removeChild(winEl);
         openWindows.delete(id);
         if (typeof onClose === "function") onClose();
       },
     };
+
+    setupWindowInteraction(winEl, topBorder, contentEl, windowMeta);
+
+    closeBtn.addEventListener("click", (evt) => {
+      evt.stopPropagation();
+      if (evt.ctrlKey || evt.metaKey) {
+        closeAllWindows();
+        return;
+      }
+      windowMeta.close();
+    });
 
     openWindows.set(id, windowMeta);
 
@@ -587,4 +787,6 @@
   document.addEventListener("mouseout", onPointerOut, true);
   document.addEventListener("mousemove", onPointerMove, true);
   document.addEventListener("click", onClick, true);
+
+  syncThemeVars();
 })();

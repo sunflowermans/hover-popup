@@ -1,0 +1,128 @@
+.jhp-hwin {
+  position: fixed;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  min-width: 150px;
+  max-width: min(92vw, 900px);
+  box-shadow: 0 0 12px rgba(0, 0, 0, 0.35);
+  background: var(--body-background-color, #fff);
+  color: var(--body-text-color, #272727);
+  border: 1px solid var(--border-color, rgba(0, 0, 0, 0.15));
+  animation: jhp-fade-in 150ms ease-out;
+}
+
+@keyframes jhp-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.jhp-hwin__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-height: 1.25rem;
+  max-height: 1.25rem;
+  padding: 0 0.25rem;
+  background: var(--sidebar-background-color, #f5f6fa);
+  border-bottom: 1px solid var(--border-color, rgba(0, 0, 0, 0.15));
+  user-select: none;
+  cursor: default;
+}
+
+.jhp-hwin[data-perm="true"] .jhp-hwin__header {
+  cursor: move;
+}
+
+.jhp-hwin__title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: none;
+}
+
+.jhp-hwin[data-perm="true"] .jhp-hwin__title {
+  display: block;
+}
+
+.jhp-hwin__actions {
+  display: none;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+.jhp-hwin[data-perm="true"] .jhp-hwin__actions {
+  display: flex;
+}
+
+.jhp-hwin__btn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.6875rem;
+  line-height: 1;
+  padding: 0.125rem 0.25rem;
+  cursor: pointer;
+  border-radius: 2px;
+  text-decoration: none;
+}
+
+.jhp-hwin__btn:hover,
+.jhp-hwin__btn:focus-visible {
+  background: rgba(0, 0, 0, 0.08);
+  outline: none;
+}
+
+.jhp-hwin__btn--link {
+  font-weight: 600;
+}
+
+.jhp-hwin__content {
+  overflow: auto;
+  max-height: 92vh;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.jhp-hwin__content main,
+.jhp-hwin__content .jhp-section {
+  margin: 0;
+}
+
+.jhp-hwin__content h1,
+.jhp-hwin__content h2,
+.jhp-hwin__content h3,
+.jhp-hwin__content h4,
+.jhp-hwin__content h5,
+.jhp-hwin__content h6 {
+  margin-top: 0;
+}
+
+.jhp-hwin__content .anchor-heading {
+  display: none;
+}
+
+.jhp-hwin__loading {
+  padding: 1rem;
+  font-size: 0.8125rem;
+  opacity: 0.7;
+}
+
+.jhp-hwin__error {
+  padding: 1rem;
+  font-size: 0.8125rem;
+  color: #b00020;
+}

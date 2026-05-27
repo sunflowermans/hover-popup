@@ -158,9 +158,34 @@
     return match ? Number(match[1]) : null;
   }
 
+  const CALLOUT_BOUNDARY_SELECTOR =
+    "blockquote[id], div[id], section[id], article[id], aside[id], details[id], li[id], p[id], table[id], dl[id], figure[id], pre[id]";
+
+  function isCalloutBoundary(el) {
+    if (!el || !el.id) return false;
+    if (el.tagName === "A") return false;
+    if (headingLevel(el) != null) return true;
+    return /^(BLOCKQUOTE|DIV|SECTION|ARTICLE|ASIDE|DETAILS|LI|P|TABLE|DL|FIGURE|PRE)$/i.test(el.tagName);
+  }
+
+  function isSectionBoundary(el) {
+    if (!el || !el.id) return false;
+    if (el.tagName === "A") return true;
+    return isCalloutBoundary(el);
+  }
+
+  function findCalloutRoot(el) {
+    if (!el) return null;
+    if (isCalloutBoundary(el)) return el;
+    const callout = el.closest(CALLOUT_BOUNDARY_SELECTOR);
+    return callout && isCalloutBoundary(callout) ? callout : null;
+  }
+
   function findSectionRoot(el) {
     if (!el) return null;
     if (headingLevel(el) != null) return el;
+    const callout = findCalloutRoot(el);
+    if (callout) return callout;
     const heading = el.closest("h1,h2,h3,h4,h5,h6");
     return heading || el;
   }
@@ -170,6 +195,7 @@
     wrapper.className = "jhp-section";
 
     const level = headingLevel(root);
+    const isIdSection = level == null && !!root.id;
     wrapper.appendChild(root.cloneNode(true));
 
     let sibling = root.nextElementSibling;
@@ -177,6 +203,7 @@
       const siblingLevel = headingLevel(sibling);
       if (level != null && siblingLevel != null && siblingLevel <= level) break;
       if (level == null && siblingLevel != null) break;
+      if (isIdSection && isSectionBoundary(sibling)) break;
       wrapper.appendChild(sibling.cloneNode(true));
       sibling = sibling.nextElementSibling;
     }

@@ -158,6 +158,8 @@
     return match ? Number(match[1]) : null;
   }
 
+  // Preview shows to the end of the callout section
+  // not to the beginning of the next parent header
   const CALLOUT_BOUNDARY_SELECTOR =
     "blockquote[id], div[id], section[id], article[id], aside[id], details[id], li[id], p[id], table[id], dl[id], figure[id], pre[id]";
 

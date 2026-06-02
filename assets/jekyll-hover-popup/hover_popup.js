@@ -346,6 +346,24 @@
     };
   }
 
+  function getPositionFromPoint(clientX, clientY) {
+    const bcr = {
+      top: clientY,
+      left: clientX,
+      bottom: clientY + 1,
+      right: clientX + 1,
+      height: 1,
+      width: 1,
+    };
+    return {
+      isFromBottom: clientY > window.innerHeight / 2,
+      isFromRight: clientX > window.innerWidth / 2,
+      clientX,
+      bcr,
+      isPreventFlicker: true,
+    };
+  }
+
   function setWindowPosition(winEl, contentEl, position) {
     const rect = winEl.getBoundingClientRect();
     const width = rect.width || winEl.offsetWidth || MIN_WIDTH;
@@ -866,6 +884,91 @@
     if (!anchor) return;
     handleClick(evt, anchor);
   }
+
+  async function openPreviewLink({ href, title, clientX, clientY, isPermanent = true }) {
+    const anchor = document.createElement("a");
+    anchor.href = href;
+    anchor.textContent = title || href;
+
+    if (!isInternalPageLink(anchor)) {
+      window.location.href = href;
+      return null;
+    }
+
+    const url = resolveUrl(href);
+    const linkKey = normalizeLinkKey(url);
+
+    for (const win of openWindows.values()) {
+      const follow = win.el.querySelector(".jhp-hwin__btn--link");
+      if (!follow) continue;
+      try {
+        if (normalizeLinkKey(resolveUrl(follow.href)) === linkKey) {
+          win.el.style.zIndex = String(++nextZIndex);
+          return win;
+        }
+      } catch {
+        /* ignore malformed href */
+      }
+    }
+
+    const win = createWindow({
+      title: title || href,
+      pageUrl: url.pathname + url.search + url.hash,
+      isPermanent,
+      onClose: () => {
+        persistentUrls.delete(linkKey);
+      },
+    });
+
+    win.setPermanent(isPermanent);
+    const position = getPositionFromPoint(clientX, clientY);
+    win.setLoading();
+    win.setPosition(position);
+    win.el.style.visibility = "visible";
+
+    try {
+      const loaded = await loadLinkContent(anchor);
+      win.setContent(loaded.content);
+      const titleEl = win.el.querySelector(".jhp-hwin__title");
+      if (titleEl) titleEl.textContent = loaded.title;
+      const followLink = win.el.querySelector(".jhp-hwin__btn--link");
+      if (followLink) followLink.href = loaded.pageUrl;
+      win.setPosition(position);
+      if (isPermanent) persistentUrls.add(linkKey);
+    } catch {
+      win.setError("Could not load preview.");
+    }
+
+    return win;
+  }
+
+  function openPreviewContent({ title, pageUrl, content, clientX, clientY, isPermanent = true, maxWidth = null }) {
+    const win = createWindow({
+      title: title || "Preview",
+      pageUrl: pageUrl || window.location.href,
+      isPermanent,
+      onClose: () => {},
+    });
+
+    win.setPermanent(isPermanent);
+    if (maxWidth) win.el.style.maxWidth = maxWidth;
+
+    const position = getPositionFromPoint(clientX, clientY);
+    win.setContent(content);
+    const titleEl = win.el.querySelector(".jhp-hwin__title");
+    if (titleEl && title) titleEl.textContent = title;
+    win.setPosition(position);
+    win.el.style.visibility = "visible";
+    return win;
+  }
+
+  window.JekyllHoverPopup = {
+    isAvailable() {
+      return true;
+    },
+    openLink: openPreviewLink,
+    openContent: openPreviewContent,
+  };
 
   document.addEventListener("mouseover", onPointerOver, true);
   document.addEventListener("mouseout", onPointerOut, true);

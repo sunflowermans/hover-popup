@@ -13,6 +13,7 @@ Inspired by the hover window behavior in [5etools](https://github.com/5etools/5e
 - Section links (`#heading-id`) show only that section; page links show the full page content
 - External links and non-page links are ignored
 - Popup windows are resizable (8 drag handles) and styled from the host page's computed theme
+- Exposes `window.JekyllHoverPopup` for other plugins (for example, image map region clicks)
 
 ## Install
 
@@ -40,6 +41,30 @@ hover_popup:
   enabled: true
   assets_path: /assets/jekyll-hover-popup
   hover_delay_ms: 300
+```
+
+## JavaScript API
+
+When loaded, the plugin exposes:
+
+```js
+window.JekyllHoverPopup.openLink({
+  href: "#section-id",
+  title: "Section title",
+  clientX: 120,
+  clientY: 240,
+  isPermanent: true,
+});
+
+window.JekyllHoverPopup.openContent({
+  title: "Custom preview",
+  pageUrl: "/docs/page/",
+  content: document.createElement("div"),
+  clientX: 120,
+  clientY: 240,
+  isPermanent: true,
+  maxWidth: "min(96vw, 1200px)",
+});
 ```
 
 ## License

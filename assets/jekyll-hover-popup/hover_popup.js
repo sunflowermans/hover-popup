@@ -126,8 +126,19 @@
     }
   }
 
+  // don't show preview for heading permalinks
+  function isHeadingPermalink(anchor) {
+    if (!anchor) return false;
+    if (anchor.classList.contains("anchor-heading")) return true;
+    const use = anchor.querySelector("use");
+    if (!use) return false;
+    const ref = use.getAttribute("href") || use.getAttributeNS("http://www.w3.org/1999/xlink", "href");
+    return ref === "#svg-link";
+  }
+
   function isInternalPageLink(anchor) {
     if (!anchor || anchor.closest(".jhp-hwin__actions")) return false;
+    if (isHeadingPermalink(anchor)) return false;
 
     const href = anchor.getAttribute("href");
     if (!href || href.startsWith("mailto:") || href.startsWith("javascript:")) return false;

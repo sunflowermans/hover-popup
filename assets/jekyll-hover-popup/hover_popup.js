@@ -3,6 +3,7 @@
 
   const config = window.__JHP_CONFIG__ || {};
   const HOVER_DELAY_MS = Number(config.hoverDelayMs) || 300;
+  const TRANSIENT_TITLE_HINT = "SHIFT to persist";
   const MAX_VIEWPORT_WIDTH = 0.92;
   const MAX_VIEWPORT_HEIGHT = 0.92;
   const MIN_WIDTH = 150;
@@ -598,8 +599,15 @@
 
     const titleEl = document.createElement("span");
     titleEl.className = "jhp-hwin__title";
-    titleEl.textContent = title;
-    titleEl.title = title;
+    let pageTitle = title;
+
+    function updateTitleDisplay() {
+      const permanent = winEl.dataset.perm === "true";
+      titleEl.textContent = permanent ? pageTitle : TRANSIENT_TITLE_HINT;
+      titleEl.title = permanent ? pageTitle : TRANSIENT_TITLE_HINT;
+    }
+
+    updateTitleDisplay();
 
     const actions = document.createElement("div");
     actions.className = "jhp-hwin__actions";
@@ -655,6 +663,11 @@
       },
       setPermanent(value) {
         winEl.dataset.perm = value ? "true" : "false";
+        updateTitleDisplay();
+      },
+      setPageTitle(value) {
+        pageTitle = value;
+        updateTitleDisplay();
       },
       close() {
         if (windowMeta.endInteraction) windowMeta.endInteraction();
@@ -765,7 +778,7 @@
         }
 
         win.setContent(loaded.content);
-        win.el.querySelector(".jhp-hwin__title").textContent = loaded.title;
+        win.setPageTitle(loaded.title);
         win.el.querySelector(".jhp-hwin__btn--link").href = loaded.pageUrl;
         win.setPosition(getPositionFromEvent(evt, anchor));
 
@@ -905,8 +918,7 @@
     try {
       const loaded = await loadLinkContent(anchor);
       win.setContent(loaded.content);
-      const titleEl = win.el.querySelector(".jhp-hwin__title");
-      if (titleEl) titleEl.textContent = loaded.title;
+      win.setPageTitle(loaded.title);
       const followLink = win.el.querySelector(".jhp-hwin__btn--link");
       if (followLink) followLink.href = loaded.pageUrl;
       win.setPosition(position);
@@ -931,8 +943,7 @@
 
     const position = getPositionFromPoint(clientX, clientY);
     win.setContent(content);
-    const titleEl = win.el.querySelector(".jhp-hwin__title");
-    if (titleEl && title) titleEl.textContent = title;
+    if (title) win.setPageTitle(title);
     win.setPosition(position);
     win.el.style.visibility = "visible";
     return win;

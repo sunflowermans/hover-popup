@@ -86,11 +86,12 @@
   white-space: nowrap;
   font-size: 0.75rem;
   font-weight: 600;
-  display: none;
+  display: block;
 }
 
-.jhp-hwin[data-perm="true"] .jhp-hwin__title {
-  display: block;
+.jhp-hwin[data-perm="false"] .jhp-hwin__title {
+  font-weight: 500;
+  opacity: 0.85;
 }
 
 .jhp-hwin__actions {

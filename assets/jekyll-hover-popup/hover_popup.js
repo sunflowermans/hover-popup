@@ -117,13 +117,7 @@
 
   function isImageLink(anchor, url) {
     if (isImagePath(url.pathname)) return true;
-    const img = anchor.querySelector("img[src]");
-    if (!img) return false;
-    try {
-      return resolveUrl(img.getAttribute("src")).pathname === url.pathname;
-    } catch {
-      return false;
-    }
+    return !!anchor.querySelector("img[src]");
   }
 
   // don't show preview for heading permalinks
@@ -153,7 +147,7 @@
     if (url.origin !== window.location.origin) return false;
     if (url.pathname.endsWith(".pdf") || url.pathname.endsWith(".zip")) return false;
 
-    if (isImageLink(anchor, url)) return true;
+    if (isImageLink(anchor, url)) return false;
 
     if (isSamePage(url)) return !!url.hash;
     if (url.hash) return true;
@@ -272,37 +266,8 @@
     return doc;
   }
 
-  async function loadImageContent(url, anchor) {
-    const img = document.createElement("img");
-    img.alt = anchor.querySelector("img")?.alt || "";
-    img.decoding = "async";
-
-    await new Promise((resolve, reject) => {
-      img.onload = () => resolve();
-      img.onerror = () => reject(new Error(`Failed to load image ${url.href}`));
-      img.src = url.href;
-    });
-
-    const wrapper = document.createElement("div");
-    wrapper.className = "jhp-image-preview";
-    wrapper.appendChild(img);
-
-    const filename = decodeURIComponent(url.pathname.split("/").pop() || "Image");
-
-    return {
-      content: wrapper,
-      title: img.alt || filename,
-      pageUrl: url.href,
-    };
-  }
-
   async function loadLinkContent(anchor) {
     const url = resolveUrl(anchor.href);
-
-    if (isImageLink(anchor, url)) {
-      return loadImageContent(url, anchor);
-    }
-
     const hash = url.hash;
 
     let doc;

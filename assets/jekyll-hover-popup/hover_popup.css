@@ -132,11 +132,21 @@
 
 .jhp-hwin__content {
   overflow: auto;
+  contain: paint;
   max-height: 92vh;
   min-height: 20px;
   padding: 0.75rem 1rem;
   background: var(--jhp-body-bg);
   color: var(--jhp-body-color);
+}
+
+/* Fix for floating bullet points.
+   JTD list markers use absolute ::before pseudo-elements. Without
+   position: relative on li, they anchor to .jhp-hwin (position: fixed)
+   and stay put while the scrollable text moves. */
+.jhp-hwin__content ul > li,
+.jhp-hwin__content ol > li {
+  position: relative;
 }
 
 .jhp-hwin__content main,

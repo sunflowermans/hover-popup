@@ -3,6 +3,7 @@
 
   const config = window.__JHP_CONFIG__ || {};
   const HOVER_DELAY_MS = Number(config.hoverDelayMs) || 300;
+  const TRANSIENT_TITLE_HINT = "SHIFT to persist";
   const MAX_VIEWPORT_WIDTH = 0.92;
   const MAX_VIEWPORT_HEIGHT = 0.92;
   const MIN_WIDTH = 150;
@@ -117,17 +118,22 @@
 
   function isImageLink(anchor, url) {
     if (isImagePath(url.pathname)) return true;
-    const img = anchor.querySelector("img[src]");
-    if (!img) return false;
-    try {
-      return resolveUrl(img.getAttribute("src")).pathname === url.pathname;
-    } catch {
-      return false;
-    }
+    return !!anchor.querySelector("img[src]");
+  }
+
+  // don't show preview for heading permalinks
+  function isHeadingPermalink(anchor) {
+    if (!anchor) return false;
+    if (anchor.classList.contains("anchor-heading")) return true;
+    const use = anchor.querySelector("use");
+    if (!use) return false;
+    const ref = use.getAttribute("href") || use.getAttributeNS("http://www.w3.org/1999/xlink", "href");
+    return ref === "#svg-link";
   }
 
   function isInternalPageLink(anchor) {
     if (!anchor || anchor.closest(".jhp-hwin__actions")) return false;
+    if (isHeadingPermalink(anchor)) return false;
 
     const href = anchor.getAttribute("href");
     if (!href || href.startsWith("mailto:") || href.startsWith("javascript:")) return false;
@@ -142,7 +148,7 @@
     if (url.origin !== window.location.origin) return false;
     if (url.pathname.endsWith(".pdf") || url.pathname.endsWith(".zip")) return false;
 
-    if (isImageLink(anchor, url)) return true;
+    if (isImageLink(anchor, url)) return false;
 
     if (isSamePage(url)) return !!url.hash;
     if (url.hash) return true;
@@ -261,37 +267,8 @@
     return doc;
   }
 
-  async function loadImageContent(url, anchor) {
-    const img = document.createElement("img");
-    img.alt = anchor.querySelector("img")?.alt || "";
-    img.decoding = "async";
-
-    await new Promise((resolve, reject) => {
-      img.onload = () => resolve();
-      img.onerror = () => reject(new Error(`Failed to load image ${url.href}`));
-      img.src = url.href;
-    });
-
-    const wrapper = document.createElement("div");
-    wrapper.className = "jhp-image-preview";
-    wrapper.appendChild(img);
-
-    const filename = decodeURIComponent(url.pathname.split("/").pop() || "Image");
-
-    return {
-      content: wrapper,
-      title: img.alt || filename,
-      pageUrl: url.href,
-    };
-  }
-
   async function loadLinkContent(anchor) {
     const url = resolveUrl(anchor.href);
-
-    if (isImageLink(anchor, url)) {
-      return loadImageContent(url, anchor);
-    }
-
     const hash = url.hash;
 
     let doc;
@@ -341,6 +318,24 @@
       isFromBottom: bcr.top > window.innerHeight / 2,
       isFromRight: bcr.left > window.innerWidth / 2,
       clientX: getClientX(evt),
+      bcr,
+      isPreventFlicker: true,
+    };
+  }
+
+  function getPositionFromPoint(clientX, clientY) {
+    const bcr = {
+      top: clientY,
+      left: clientX,
+      bottom: clientY + 1,
+      right: clientX + 1,
+      height: 1,
+      width: 1,
+    };
+    return {
+      isFromBottom: clientY > window.innerHeight / 2,
+      isFromRight: clientX > window.innerWidth / 2,
+      clientX,
       bcr,
       isPreventFlicker: true,
     };
@@ -604,8 +599,15 @@
 
     const titleEl = document.createElement("span");
     titleEl.className = "jhp-hwin__title";
-    titleEl.textContent = title;
-    titleEl.title = title;
+    let pageTitle = title;
+
+    function updateTitleDisplay() {
+      const permanent = winEl.dataset.perm === "true";
+      titleEl.textContent = permanent ? pageTitle : TRANSIENT_TITLE_HINT;
+      titleEl.title = permanent ? pageTitle : TRANSIENT_TITLE_HINT;
+    }
+
+    updateTitleDisplay();
 
     const actions = document.createElement("div");
     actions.className = "jhp-hwin__actions";
@@ -661,6 +663,11 @@
       },
       setPermanent(value) {
         winEl.dataset.perm = value ? "true" : "false";
+        updateTitleDisplay();
+      },
+      setPageTitle(value) {
+        pageTitle = value;
+        updateTitleDisplay();
       },
       close() {
         if (windowMeta.endInteraction) windowMeta.endInteraction();
@@ -771,7 +778,7 @@
         }
 
         win.setContent(loaded.content);
-        win.el.querySelector(".jhp-hwin__title").textContent = loaded.title;
+        win.setPageTitle(loaded.title);
         win.el.querySelector(".jhp-hwin__btn--link").href = loaded.pageUrl;
         win.setPosition(getPositionFromEvent(evt, anchor));
 
@@ -866,6 +873,89 @@
     if (!anchor) return;
     handleClick(evt, anchor);
   }
+
+  async function openPreviewLink({ href, title, clientX, clientY, isPermanent = true }) {
+    const anchor = document.createElement("a");
+    anchor.href = href;
+    anchor.textContent = title || href;
+
+    if (!isInternalPageLink(anchor)) {
+      window.location.href = href;
+      return null;
+    }
+
+    const url = resolveUrl(href);
+    const linkKey = normalizeLinkKey(url);
+
+    for (const win of openWindows.values()) {
+      const follow = win.el.querySelector(".jhp-hwin__btn--link");
+      if (!follow) continue;
+      try {
+        if (normalizeLinkKey(resolveUrl(follow.href)) === linkKey) {
+          win.el.style.zIndex = String(++nextZIndex);
+          return win;
+        }
+      } catch {
+        /* ignore malformed href */
+      }
+    }
+
+    const win = createWindow({
+      title: title || href,
+      pageUrl: url.pathname + url.search + url.hash,
+      isPermanent,
+      onClose: () => {
+        persistentUrls.delete(linkKey);
+      },
+    });
+
+    win.setPermanent(isPermanent);
+    const position = getPositionFromPoint(clientX, clientY);
+    win.setLoading();
+    win.setPosition(position);
+    win.el.style.visibility = "visible";
+
+    try {
+      const loaded = await loadLinkContent(anchor);
+      win.setContent(loaded.content);
+      win.setPageTitle(loaded.title);
+      const followLink = win.el.querySelector(".jhp-hwin__btn--link");
+      if (followLink) followLink.href = loaded.pageUrl;
+      win.setPosition(position);
+      if (isPermanent) persistentUrls.add(linkKey);
+    } catch {
+      win.setError("Could not load preview.");
+    }
+
+    return win;
+  }
+
+  function openPreviewContent({ title, pageUrl, content, clientX, clientY, isPermanent = true, maxWidth = null }) {
+    const win = createWindow({
+      title: title || "Preview",
+      pageUrl: pageUrl || window.location.href,
+      isPermanent,
+      onClose: () => {},
+    });
+
+    win.setPermanent(isPermanent);
+    if (maxWidth) win.el.style.maxWidth = maxWidth;
+
+    const position = getPositionFromPoint(clientX, clientY);
+    win.setContent(content);
+    if (title) win.setPageTitle(title);
+    win.setPosition(position);
+    win.el.style.visibility = "visible";
+    return win;
+  }
+
+  window.JekyllHoverPopup = {
+    isAvailable() {
+      return true;
+    },
+    openLink: openPreviewLink,
+    openContent: openPreviewContent,
+  };
 
   document.addEventListener("mouseover", onPointerOver, true);
   document.addEventListener("mouseout", onPointerOut, true);

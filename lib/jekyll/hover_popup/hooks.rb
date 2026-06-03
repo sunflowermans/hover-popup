@@ -10,7 +10,7 @@ module Jekyll
 
           assets_path = cfg["assets_path"] || "/assets/jekyll-hover-popup"
           assets_path = "/#{assets_path}" unless assets_path.start_with?("/")
-          hover_delay_ms = cfg["hover_delay_ms"] || 300
+          hover_delay_ms = cfg["hover_delay_ms"] || 0
 
           begin
             doc.output = inject_assets(doc.output.to_s, assets_path: assets_path, hover_delay_ms: hover_delay_ms)

@@ -40,7 +40,7 @@ Optional `_config.yml` settings:
 hover_popup:
   enabled: true
   assets_path: /assets/jekyll-hover-popup
-  hover_delay_ms: 300
+  hover_delay_ms: 0
 ```
 
 ## JavaScript API

@@ -2,7 +2,7 @@
   "use strict";
 
   const config = window.__JHP_CONFIG__ || {};
-  const HOVER_DELAY_MS = Number(config.hoverDelayMs) || 300;
+  const HOVER_DELAY_MS = Number(config.hoverDelayMs) || 0;
   const TRANSIENT_TITLE_HINT = "SHIFT to persist";
   const MAX_VIEWPORT_WIDTH = 0.92;
   const MAX_VIEWPORT_HEIGHT = 0.92;
@@ -740,7 +740,8 @@
     anchor.style.cursor = "progress";
 
     clearTimeout(meta.hoverTimer);
-    meta.hoverTimer = setTimeout(async () => {
+
+    const showPreview = async () => {
       if (!meta.isHovered && !meta.isPermanent) return;
 
       meta.isLoading = true;
@@ -795,7 +796,13 @@
         meta.isLoading = false;
         anchor.style.cursor = "";
       }
-    }, HOVER_DELAY_MS);
+    };
+
+    if (HOVER_DELAY_MS > 0) {
+      meta.hoverTimer = setTimeout(showPreview, HOVER_DELAY_MS);
+    } else {
+      showPreview();
+    }
   }
 
   function handleMouseLeave(evt, anchor) {

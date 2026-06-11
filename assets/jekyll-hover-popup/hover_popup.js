@@ -3,6 +3,7 @@
 
   const config = window.__JHP_CONFIG__ || {};
   const HOVER_DELAY_MS = Number(config.hoverDelayMs) || 0;
+  const NAV_HOVER_PREVIEW = config.navHoverPreview !== false;
   const TRANSIENT_TITLE_HINT = "SHIFT to persist";
   const MAX_VIEWPORT_WIDTH = 0.92;
   const MAX_VIEWPORT_HEIGHT = 0.92;
@@ -121,6 +122,11 @@
     return !!anchor.querySelector("img[src]");
   }
 
+  // don't show preview for links inside a navigation element
+  function isNavLink(anchor) {
+    return !!anchor.closest("nav, .site-nav, .nav-list, [role='navigation']");
+  }
+
   // don't show preview for heading permalinks
   function isHeadingPermalink(anchor) {
     if (!anchor) return false;
@@ -134,6 +140,7 @@
   function isInternalPageLink(anchor) {
     if (!anchor || anchor.closest(".jhp-hwin__actions")) return false;
     if (isHeadingPermalink(anchor)) return false;
+    if (!NAV_HOVER_PREVIEW && isNavLink(anchor)) return false;
 
     const href = anchor.getAttribute("href");
     if (!href || href.startsWith("mailto:") || href.startsWith("javascript:")) return false;

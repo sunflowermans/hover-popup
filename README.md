@@ -41,7 +41,10 @@ hover_popup:
   enabled: true
   assets_path: /assets/jekyll-hover-popup
   hover_delay_ms: 0
+  nav_hover_preview: true
 ```
+
+Set `nav_hover_preview: false` to disable hover previews for links inside navigation elements (`.site-nav`, `nav`, `[role="navigation"]`, etc.).
 
 ## JavaScript API
 

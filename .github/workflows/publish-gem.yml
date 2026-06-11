@@ -1,0 +1,60 @@
+name: Release Gem
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+
+      - name: Verify tag matches gem version
+        run: |
+          GEMSPEC=$(find . -maxdepth 1 -name "*.gemspec" | head -n1)
+
+          if [ -z "$GEMSPEC" ]; then
+            echo "No gemspec found"
+            exit 1
+          fi
+
+          GEM_VERSION=$(ruby -e "spec = Gem::Specification.load('$GEMSPEC'); puts spec.version")
+          TAG_VERSION=${GITHUB_REF_NAME#v}
+
+          echo "Gem version: $GEM_VERSION"
+          echo "Tag version: $TAG_VERSION"
+
+          if [ "$GEM_VERSION" != "$TAG_VERSION" ]; then
+            echo "ERROR: Tag version ($TAG_VERSION) does not match gem version ($GEM_VERSION)"
+            exit 1
+          fi
+
+      - name: Build gem
+        run: gem build *.gemspec
+
+      - name: Publish to RubyGems
+        env:
+          GEM_HOST_API_KEY: ${{ secrets.RUBYGEMS_API_KEY }}
+        run: |
+          GEM_FILE=$(ls *.gem | head -n1)
+          echo "Publishing $GEM_FILE"
+          gem push "$GEM_FILE"
+
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create \
+            "$GITHUB_REF_NAME" \
+            --generate-notes \
+            *.gem

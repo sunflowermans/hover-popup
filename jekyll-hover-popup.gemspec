@@ -6,7 +6,7 @@ Gem::Specification.new do |spec|
   spec.email = []
 
   spec.summary = "Jekyll plugin that shows in-page hover previews for internal documentation links."
-  spec.homepage = "https://github.com/directsun/jekyll-hover-popup"
+  spec.homepage = "https://github.com/sunflowermans/hover-popup"
   spec.license = "MIT"
 
   spec.required_ruby_version = ">= 3.0"

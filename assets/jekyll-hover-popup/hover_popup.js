@@ -96,6 +96,32 @@
     return new URL(href, window.location.href);
   }
 
+  function resolveUrlAgainst(href, basePageUrl) {
+    const base = basePageUrl.startsWith("http")
+      ? basePageUrl
+      : new URL(basePageUrl, window.location.origin).href;
+    return new URL(href, base);
+  }
+
+  function rewriteContentLinks(content, basePageUrl) {
+    if (!content || !basePageUrl) return;
+
+    content.querySelectorAll("a[href]").forEach((anchor) => {
+      if (anchor.closest(".jhp-hwin__actions")) return;
+
+      const href = anchor.getAttribute("href");
+      if (!href || href.startsWith("mailto:") || href.startsWith("javascript:")) return;
+
+      try {
+        const resolved = resolveUrlAgainst(href, basePageUrl);
+        if (resolved.origin !== window.location.origin) return;
+        anchor.setAttribute("href", resolved.pathname + resolved.search + resolved.hash);
+      } catch {
+        /* ignore malformed href */
+      }
+    });
+  }
+
   function normalizePath(pathname) {
     if (!pathname) return "/";
     const normalized = pathname.endsWith("/") ? pathname : `${pathname}/`;
@@ -290,11 +316,14 @@
 
     const titleNode = content.querySelector("h1,h2,h3,h4,h5,h6");
     const title = titleNode ? titleNode.textContent.trim() : anchor.textContent.trim() || url.pathname;
+    const pageUrl = url.pathname + url.search + url.hash;
+
+    rewriteContentLinks(content, pageUrl);
 
     return {
       content,
       title,
-      pageUrl: url.pathname + url.search + url.hash,
+      pageUrl,
     };
   }
 
@@ -956,6 +985,7 @@
     if (maxWidth) win.el.style.maxWidth = maxWidth;
 
     const position = getPositionFromPoint(clientX, clientY);
+    rewriteContentLinks(content, pageUrl || window.location.pathname + window.location.search + window.location.hash);
     win.setContent(content);
     if (title) win.setPageTitle(title);
     win.setPosition(position);

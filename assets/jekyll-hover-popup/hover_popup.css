@@ -72,6 +72,26 @@
   cursor: move;
 }
 
+.jhp-hwin__rollup {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 220ms ease;
+  min-height: 0;
+}
+
+.jhp-hwin--rolled-up .jhp-hwin__rollup {
+  grid-template-rows: 0fr;
+}
+
+.jhp-hwin__rollup-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+
+.jhp-hwin--rolled-up .jhp-resize {
+  display: none;
+}
+
 .jhp-border--bottom {
   min-height: 3px;
   border-top: 1px solid var(--jhp-border-color);

@@ -426,7 +426,12 @@
       winEl.style.top = `${Math.max(0, screenH - rect.height - 8)}px`;
     }
 
-    if (position && position.isPreventFlicker && position.bcr) {
+    if (
+      !winEl.classList.contains("jhp-hwin--rolled-up") &&
+      position &&
+      position.isPreventFlicker &&
+      position.bcr
+    ) {
       rect = winEl.getBoundingClientRect();
       const overlap =
         rect.left < position.bcr.right &&
@@ -482,6 +487,8 @@
   }
 
   function setupWindowInteraction(winEl, header, contentEl, windowMeta) {
+    let suppressDragUntil = 0;
+
     const drag = {
       type: DRAG_NONE,
       startX: 0,
@@ -493,6 +500,8 @@
     };
 
     function beginInteraction(evt, type) {
+      if (winEl.classList.contains("jhp-hwin--rolled-up") && type !== DRAG_MOVE) return;
+
       drag.type = type;
       drag.startX = getClientX(evt);
       drag.startY = getClientY(evt);
@@ -608,8 +617,19 @@
       if (winEl.dataset.perm !== "true") return;
       if (evt.button !== 0) return;
       if (evt.target.closest(".jhp-hwin__btn")) return;
+      if (Date.now() < suppressDragUntil) return;
       evt.preventDefault();
       beginInteraction(evt, DRAG_MOVE);
+    });
+
+    header.addEventListener("dblclick", (evt) => {
+      if (winEl.dataset.perm !== "true") return;
+      if (evt.target.closest(".jhp-hwin__btn")) return;
+      evt.preventDefault();
+      evt.stopPropagation();
+      suppressDragUntil = Date.now() + 300;
+      if (windowMeta.endInteraction) windowMeta.endInteraction();
+      windowMeta.toggleRollup();
     });
 
     addResizeHandle(winEl, "jhp-resize-n", DRAG_N, beginInteraction);
@@ -651,6 +671,7 @@
     }
 
     updateTitleDisplay();
+    if (isPermanent) topBorder.title = "Double-click to roll up or down";
 
     const actions = document.createElement("div");
     actions.className = "jhp-hwin__actions";
@@ -680,20 +701,72 @@
     const bottomBorder = document.createElement("div");
     bottomBorder.className = "jhp-border jhp-border--bottom";
 
+    const rollupInner = document.createElement("div");
+    rollupInner.className = "jhp-hwin__rollup-inner";
+    rollupInner.appendChild(contentEl);
+    rollupInner.appendChild(bottomBorder);
+
+    const rollupEl = document.createElement("div");
+    rollupEl.className = "jhp-hwin__rollup";
+    rollupEl.appendChild(rollupInner);
+
     winEl.appendChild(topBorder);
-    winEl.appendChild(contentEl);
-    winEl.appendChild(bottomBorder);
+    winEl.appendChild(rollupEl);
     document.body.appendChild(winEl);
+
+    let rolledUp = false;
+    let savedRollupStyles = null;
+
+    function captureRollupStyles() {
+      return {
+        contentHeight: contentEl.style.height,
+        contentMaxHeight: contentEl.style.maxHeight,
+        winWidth: winEl.style.width,
+        winMaxWidth: winEl.style.maxWidth,
+      };
+    }
+
+    function restoreRollupStyles() {
+      if (!savedRollupStyles) return;
+      contentEl.style.height = savedRollupStyles.contentHeight;
+      contentEl.style.maxHeight = savedRollupStyles.contentMaxHeight;
+      winEl.style.width = savedRollupStyles.winWidth;
+      winEl.style.maxWidth = savedRollupStyles.winMaxWidth;
+    }
+
+    function setRolledUp(value) {
+      rolledUp = value;
+      winEl.classList.toggle("jhp-hwin--rolled-up", rolledUp);
+      winEl.dataset.rolledUp = rolledUp ? "true" : "false";
+    }
+
+    function toggleRollup() {
+      if (winEl.dataset.perm !== "true") return;
+
+      if (!rolledUp) {
+        savedRollupStyles = captureRollupStyles();
+        setRolledUp(true);
+        return;
+      }
+
+      setRolledUp(false);
+      restoreRollupStyles();
+      adjustWindowToViewport(winEl, contentEl, null);
+    }
 
     const windowMeta = {
       id,
       el: winEl,
       contentEl,
       endInteraction: null,
+      toggleRollup,
+      isRolledUp() {
+        return rolledUp;
+      },
       setContent(node) {
         contentEl.innerHTML = "";
         contentEl.appendChild(node);
-        fitWindowToContent(winEl, contentEl);
+        if (!rolledUp) fitWindowToContent(winEl, contentEl);
       },
       setLoading() {
         contentEl.innerHTML = '<div class="jhp-hwin__loading">Loading…</div>';
@@ -707,6 +780,11 @@
       setPermanent(value) {
         winEl.dataset.perm = value ? "true" : "false";
         updateTitleDisplay();
+        topBorder.title = value ? "Double-click to roll up or down" : "";
+        if (!value && rolledUp) {
+          setRolledUp(false);
+          restoreRollupStyles();
+        }
       },
       setPageTitle(value) {
         pageTitle = value;

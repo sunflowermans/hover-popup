@@ -103,11 +103,17 @@
     return new URL(href, base);
   }
 
+  function isDiceTrayLink(anchor) {
+    if (!anchor) return false;
+    return anchor.classList.contains("dice-tray-roll") || anchor.hasAttribute("data-dice");
+  }
+
   function rewriteContentLinks(content, basePageUrl) {
     if (!content || !basePageUrl) return;
 
     content.querySelectorAll("a[href]").forEach((anchor) => {
       if (anchor.closest(".jhp-hwin__actions")) return;
+      if (isDiceTrayLink(anchor)) return;
 
       const href = anchor.getAttribute("href");
       if (!href || href.startsWith("mailto:") || href.startsWith("javascript:")) return;
@@ -165,6 +171,7 @@
 
   function isInternalPageLink(anchor) {
     if (!anchor || anchor.closest(".jhp-hwin__actions")) return false;
+    if (isDiceTrayLink(anchor)) return false;
     if (isHeadingPermalink(anchor)) return false;
     if (!NAV_HOVER_PREVIEW && isNavLink(anchor)) return false;
 

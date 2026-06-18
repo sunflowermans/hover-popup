@@ -14,6 +14,8 @@ Inspired by the hover window behavior in [5etools](https://github.com/5etools/5e
 - Eight point window resize
 - Exposes `window.JekyllHoverPopup` for other plugins
 
+<img width="640" height="360" alt="window-preview-demo-2" src="https://github.com/user-attachments/assets/1f8f60ad-ad2a-4418-ad0f-0494f4e43faf" />
+
 ## Install
 
 Add to your site `Gemfile`:

@@ -6,14 +6,13 @@ Inspired by the hover window behavior in [5etools](https://github.com/5etools/5e
 
 ## Features
 
-- Hover an internal link to preview its target content in a floating window
-- Hold **Shift** while hovering (or when leaving the link) to pin the preview
-- Pinned windows show **Follow link** and **Close** (Ctrl/Cmd+click Close to close all)
-- Pinned links do not open additional previews on further hovers
-- Section links (`#heading-id`) show only that section; page links show the full page content
-- External links and non-page links are ignored
-- Popup windows are resizable (8 drag handles) and styled from the host page's computed theme
-- Exposes `window.JekyllHoverPopup` for other plugins (for example, image map region clicks)
+- Hover over an [internal link](/docs/a-familiar-tower/#biting-fly-giant) to see a reference preview
+- Persist windows by holding the SHIFT key
+- Close all windows by holding CTRL while closing one
+- Minimize windows by double clicking the title bar
+- Navigate to an entry later by clicking the link in the title bar
+- Eight point window resize
+- Exposes `window.JekyllHoverPopup` for other plugins
 
 ## Install
 
@@ -44,6 +43,8 @@ hover_popup:
   nav_hover_preview: true
 ```
 
+Add a `hover_delay_ms` to delay the preview window creation
+
 Set `nav_hover_preview: false` to disable hover previews for links inside navigation elements (`.site-nav`, `nav`, `[role="navigation"]`, etc.).
 
 ## JavaScript API
@@ -72,4 +73,4 @@ window.JekyllHoverPopup.openContent({
 
 ## License
 
-MIT
+[MIT](LICENSE)

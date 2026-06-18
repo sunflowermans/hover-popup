@@ -6,7 +6,7 @@ Inspired by the hover window behavior in [5etools](https://github.com/5etools/5e
 
 ## Features
 
-- Hover over an [internal link](/docs/a-familiar-tower/#biting-fly-giant) to see a reference preview
+- Hover over an internal link to see a reference preview
 - Persist windows by holding the SHIFT key
 - Close all windows by holding CTRL while closing one
 - Minimize windows by double clicking the title bar

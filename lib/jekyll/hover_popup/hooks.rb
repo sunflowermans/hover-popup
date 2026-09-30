@@ -11,7 +11,7 @@ module Jekyll
           assets_path = cfg["assets_path"] || "/assets/jekyll-hover-popup"
           assets_path = "/#{assets_path}" unless assets_path.start_with?("/")
           hover_delay_ms = cfg["hover_delay_ms"] || 0
-          nav_hover_preview = cfg.fetch("nav_hover_preview", true)
+          nav_hover_preview = cfg.fetch("nav_hover_preview", false)
 
           begin
             doc.output = inject_assets(doc.output.to_s, assets_path: assets_path, hover_delay_ms: hover_delay_ms, nav_hover_preview: nav_hover_preview)
@@ -21,7 +21,7 @@ module Jekyll
         end
       end
 
-      def self.inject_assets(html, assets_path:, hover_delay_ms:, nav_hover_preview: true)
+      def self.inject_assets(html, assets_path:, hover_delay_ms:, nav_hover_preview: false)
         return html if html.include?('data-hover-popup-root="true"')
 
         tags = <<~HTML

@@ -3,7 +3,7 @@
 
   const config = window.__JHP_CONFIG__ || {};
   const HOVER_DELAY_MS = Number(config.hoverDelayMs) || 0;
-  const NAV_HOVER_PREVIEW = config.navHoverPreview !== false;
+  const NAV_HOVER_PREVIEW = config.navHoverPreview === true;
   const TRANSIENT_TITLE_HINT = "SHIFT to persist";
   const MAX_VIEWPORT_WIDTH = 0.92;
   const MAX_VIEWPORT_HEIGHT = 0.92;

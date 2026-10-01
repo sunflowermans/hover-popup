@@ -128,10 +128,16 @@
     });
   }
 
+  function stripHtmlExtension(pathname) {
+    return pathname.replace(/\.html?$/i, "");
+  }
+
   function normalizePath(pathname) {
     if (!pathname) return "/";
-    const normalized = pathname.endsWith("/") ? pathname : `${pathname}/`;
-    return normalized;
+    // Treat /page.html and /page/ as the same document for cache/same-page checks.
+    let path = stripHtmlExtension(pathname);
+    if (!path.endsWith("/")) path = `${path}/`;
+    return path || "/";
   }
 
   function normalizeLinkKey(url) {
@@ -143,6 +149,30 @@
       normalizePath(url.pathname) === normalizePath(window.location.pathname) &&
       url.search === window.location.search
     );
+  }
+
+  // Prefer paths that static hosts (esp. Cloudflare Pages) resolve correctly.
+  // Never request `page.html/` — that often SPA-fallbacks to the site index.
+  function fetchPathCandidates(pathname) {
+    const paths = [];
+    const push = (p) => {
+      if (p && !paths.includes(p)) paths.push(p);
+    };
+
+    if (/\.html?$/i.test(pathname)) {
+      push(pathname);
+      const withoutExt = stripHtmlExtension(pathname) || "/";
+      push(withoutExt);
+      if (!withoutExt.endsWith("/")) push(`${withoutExt}/`);
+      return paths;
+    }
+
+    const withSlash = pathname.endsWith("/") ? pathname : `${pathname}/`;
+    const withoutSlash = pathname.endsWith("/") ? pathname.replace(/\/+$/, "") || "/" : pathname;
+    push(withSlash);
+    push(withoutSlash);
+    if (withoutSlash !== "/") push(`${withoutSlash}.html`);
+    return paths;
   }
 
   function isImagePath(pathname) {
@@ -281,30 +311,25 @@
   }
 
   async function fetchPageDocument(pathname) {
-    const cacheKey = pathname.endsWith("/") ? pathname : `${pathname}/`;
+    const cacheKey = normalizePath(pathname);
     if (pageCache.has(cacheKey)) return pageCache.get(cacheKey);
 
-    const fetchPath = cacheKey;
-    const response = await fetch(fetchPath, { credentials: "same-origin" });
-    if (!response.ok) {
-      const fallback = pathname.endsWith("/") ? pathname.slice(0, -1) : `${pathname}/`;
-      if (fallback !== fetchPath) {
-        const retry = await fetch(fallback, { credentials: "same-origin" });
-        if (retry.ok) {
-          const html = await retry.text();
-          const doc = new DOMParser().parseFromString(html, "text/html");
-          pageCache.set(cacheKey, doc);
-          pageCache.set(fallback, doc);
-          return doc;
-        }
+    let lastError;
+    for (const fetchPath of fetchPathCandidates(pathname)) {
+      try {
+        const response = await fetch(fetchPath, { credentials: "same-origin" });
+        if (!response.ok) continue;
+
+        const html = await response.text();
+        const doc = new DOMParser().parseFromString(html, "text/html");
+        pageCache.set(cacheKey, doc);
+        return doc;
+      } catch (err) {
+        lastError = err;
       }
-      throw new Error(`Failed to load ${fetchPath}`);
     }
 
-    const html = await response.text();
-    const doc = new DOMParser().parseFromString(html, "text/html");
-    pageCache.set(cacheKey, doc);
-    return doc;
+    throw lastError || new Error(`Failed to load ${pathname}`);
   }
 
   async function loadLinkContent(anchor) {
@@ -312,7 +337,7 @@
     const hash = url.hash;
 
     let doc;
-    if (url.pathname === window.location.pathname && url.search === window.location.search) {
+    if (isSamePage(url)) {
       doc = document;
     } else {
       doc = await fetchPageDocument(url.pathname);

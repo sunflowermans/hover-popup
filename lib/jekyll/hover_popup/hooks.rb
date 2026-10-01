@@ -8,8 +8,7 @@ module Jekyll
           next if cfg["enabled"] == false
           next unless doc.respond_to?(:output_ext) && doc.output_ext == ".html"
 
-          assets_path = cfg["assets_path"] || "/assets/jekyll-hover-popup"
-          assets_path = "/#{assets_path}" unless assets_path.start_with?("/")
+          assets_path = resolve_assets_path(site, cfg)
           hover_delay_ms = cfg["hover_delay_ms"] || 0
           nav_hover_preview = cfg.fetch("nav_hover_preview", false)
 
@@ -19,6 +18,21 @@ module Jekyll
             Jekyll.logger.warn("jekyll-hover-popup:", "Failed to process #{doc.relative_path}: #{e.class}: #{e.message}")
           end
         end
+      end
+
+      # Site-root path (e.g. "/assets/jekyll-hover-popup"), with site.baseurl prepended.
+      def self.resolve_assets_path(site, cfg)
+        assets_path = cfg["assets_path"] || "/assets/jekyll-hover-popup"
+        assets_path = "/#{assets_path}" unless assets_path.start_with?("/")
+
+        baseurl = site.config["baseurl"].to_s
+        baseurl = "" if baseurl == "/"
+        baseurl = baseurl.chomp("/")
+
+        return assets_path if baseurl.empty?
+        return assets_path if assets_path == baseurl || assets_path.start_with?("#{baseurl}/")
+
+        "#{baseurl}#{assets_path}"
       end
 
       def self.inject_assets(html, assets_path:, hover_delay_ms:, nav_hover_preview: false)

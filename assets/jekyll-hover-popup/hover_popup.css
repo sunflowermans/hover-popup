@@ -199,6 +199,22 @@
   color: var(--jhp-error-color);
 }
 
+.jhp-hwin__notice {
+  padding: 1rem;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.jhp-hwin__notice p {
+  margin: 0 0 0.5rem;
+  opacity: 0.85;
+}
+
+.jhp-hwin__notice a {
+  color: var(--jhp-link-color, inherit);
+}
+
 .jhp-resize {
   position: absolute;
   touch-action: none;

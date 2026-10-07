@@ -310,6 +310,54 @@
     return cloneSectionFromRoot(root, doc);
   }
 
+  function parseMetaRefreshUrl(content) {
+    if (!content) return null;
+    const match = String(content).match(/url\s*=\s*['"]?([^'";\s]+)/i);
+    return match ? match[1].trim() : null;
+  }
+
+  function looksLikeRedirectStub(doc) {
+    const title = (doc.title || "").trim().toLowerCase();
+    if (title.includes("redirect")) return true;
+    if (doc.querySelector('meta[http-equiv="refresh" i]')) return true;
+
+    for (const script of doc.querySelectorAll("script")) {
+      const text = script.textContent || "";
+      if (/location\s*=\s*["']/.test(text)) return true;
+    }
+    return false;
+  }
+
+  // jekyll-redirect-from (redirect_to) pages: no main content, meta refresh / JS location.
+  function detectExternalRedirect(doc) {
+    if (!doc || !looksLikeRedirectStub(doc)) return null;
+
+    const refresh = doc.querySelector('meta[http-equiv="refresh" i]');
+    let destination = refresh ? parseMetaRefreshUrl(refresh.getAttribute("content")) : null;
+
+    if (!destination) {
+      const canonical = doc.querySelector('link[rel="canonical"]');
+      if (canonical) destination = canonical.getAttribute("href");
+    }
+
+    if (!destination) {
+      const link = doc.querySelector("a[href]");
+      if (link) destination = link.getAttribute("href");
+    }
+
+    if (!destination) return null;
+
+    let destUrl;
+    try {
+      destUrl = new URL(destination, window.location.origin);
+    } catch {
+      return null;
+    }
+
+    if (destUrl.origin === window.location.origin) return null;
+    return destUrl.href;
+  }
+
   async function fetchPageDocument(pathname) {
     const cacheKey = normalizePath(pathname);
     if (pageCache.has(cacheKey)) return pageCache.get(cacheKey);
@@ -343,16 +391,27 @@
       doc = await fetchPageDocument(url.pathname);
     }
 
+    const pageUrl = url.pathname + url.search + url.hash;
+    const redirectTo = detectExternalRedirect(doc);
+    if (redirectTo) {
+      return {
+        kind: "redirect",
+        destination: redirectTo,
+        title: "External redirect",
+        pageUrl,
+      };
+    }
+
     const content = extractContent(doc, hash);
     if (!content) throw new Error("Section not found");
 
     const titleNode = content.querySelector("h1,h2,h3,h4,h5,h6");
     const title = titleNode ? titleNode.textContent.trim() : anchor.textContent.trim() || url.pathname;
-    const pageUrl = url.pathname + url.search + url.hash;
 
     rewriteContentLinks(content, pageUrl);
 
     return {
+      kind: "content",
       content,
       title,
       pageUrl,
@@ -799,6 +858,25 @@
       setError(message) {
         contentEl.innerHTML = `<div class="jhp-hwin__error">${message}</div>`;
       },
+      setRedirectNotice(destination) {
+        contentEl.innerHTML = "";
+        const wrap = document.createElement("div");
+        wrap.className = "jhp-hwin__notice";
+
+        const label = document.createElement("p");
+        label.textContent = "This page redirects to an external site:";
+
+        const link = document.createElement("a");
+        link.href = destination;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.textContent = destination;
+
+        wrap.appendChild(label);
+        wrap.appendChild(link);
+        contentEl.appendChild(wrap);
+        if (!rolledUp) fitWindowToContent(winEl, contentEl);
+      },
       setPosition(position) {
         setWindowPosition(winEl, contentEl, position);
       },
@@ -924,9 +1002,13 @@
           return;
         }
 
-        win.setContent(loaded.content);
         win.setPageTitle(loaded.title);
         win.el.querySelector(".jhp-hwin__btn--link").href = loaded.pageUrl;
+        if (loaded.kind === "redirect") {
+          win.setRedirectNotice(loaded.destination);
+        } else {
+          win.setContent(loaded.content);
+        }
         win.setPosition(getPositionFromEvent(evt, anchor));
 
         if (meta.isPermanent) {
@@ -1070,10 +1152,14 @@
 
     try {
       const loaded = await loadLinkContent(anchor);
-      win.setContent(loaded.content);
       win.setPageTitle(loaded.title);
       const followLink = win.el.querySelector(".jhp-hwin__btn--link");
       if (followLink) followLink.href = loaded.pageUrl;
+      if (loaded.kind === "redirect") {
+        win.setRedirectNotice(loaded.destination);
+      } else {
+        win.setContent(loaded.content);
+      }
       win.setPosition(position);
       if (isPermanent) persistentUrls.add(linkKey);
     } catch {
